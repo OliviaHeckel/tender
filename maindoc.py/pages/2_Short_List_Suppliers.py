@@ -6,7 +6,7 @@
 import streamlit as st
 import pandas as pd
 
-df = pd.read_csv("main/filtered_supliers.csv")
+df = pd.read_csv("filtered_supliers.csv")
 if "Answer" not in df.columns:
     df["Answer"] = ""
     updated_rows = []
