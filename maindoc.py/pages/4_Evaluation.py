@@ -3,136 +3,14 @@ import pandas as pd
 import os
 import sqlite3
 
-# ── Page Config ──────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Team Supplier Evaluation Matrix & Contract Tracker",
-    page_icon="👥",
-    layout="wide",
-)
-
-# ── Hide Developer UI & Source Code Options ──────────────────────────────────
-hide_ui_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    </style>
-"""
-st.markdown(hide_ui_style, unsafe_allow_html=True)
-
-# ── Database Initialization ──────────────────────────────────────────────────
-DB_FILE = "team_evaluations.db"
-
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS ratings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            evaluator TEXT,
-            supplier TEXT,
-            final_score REAL
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-def save_multiple_ratings(evaluator, supplier_scores):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    for supplier, score in supplier_scores.items():
-        c.execute("INSERT INTO ratings (evaluator, supplier, final_score) VALUES (?, ?, ?)", 
-                  (evaluator, supplier, score))
-    conn.commit()
-    conn.close()
-
-def load_all_ratings():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query("SELECT * FROM ratings", conn)
-    conn.close()
-    return df
-
-# Initialize the shared database
-init_db()
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.title("🎯 Collaborative Supplier Evaluation & Contract Tracking Hub")
 st.write("Select your organizational role, manage structural contract approvals, and evaluate suppliers simultaneously.")
 st.divider()
 
-# --- Section 1: Document Upload & Approval Tracker ---
-st.header("📄 Contract Management")
 
-st.subheader("📁 Vertragsunterlage / Contract Document")
-uploaded_file = st.file_uploader("Vertrag hochladen / Upload the contract (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"])
 
-if uploaded_file is not None:
-    st.success(f"Datei '{uploaded_file.name}' erfolgreich hochgeladen / uploaded successfully!")
-    st.download_button(
-        label="Vertrag herunterladen / Download Contract",
-        data=uploaded_file,
-        file_name=uploaded_file.name,
-        mime=uploaded_file.type
-    )
-else:
-    st.info("Bitte hochladen / Please upload to begin the approval process.")
-
-st.subheader("✍️ Genehmigungsverfolgung / Approval Tracker")
-
-tracker_data = [
-    {"Abteilung": "Headquarters\nWeiterbildung", "Unterschrift": False},
-    {"Abteilung": "Headquarters\nQualität", "Unterschrift": False},
-    {"Abteilung": "Headquarters\nIndirekt Beschaffung", "Unterschrift": False},
-    {"Abteilung": "Site (Hannover)\nQualität", "Unterschrift": False},
-    {"Abteilung": "Site (Hannover)\nPersonalabteilung", "Unterschrift": False},
-    {"Abteilung": "Kunde Account Manager\n(AUDI)", "Unterschrift": False}
-]
-
-if "approval_data_structured" not in st.session_state:
-    st.session_state.approval_data_structured = tracker_data
-
-def update_signature_status(edited_data):
-    current_data = st.session_state.approval_data_structured
-    for idx, row in enumerate(edited_data):
-        if idx < len(current_data):
-            current_data[idx]["Unterschrift"] = row.get("Unterschrift", False)
-    st.session_state.approval_data_structured = current_data
-
-edited_df = st.data_editor(
-    st.session_state.approval_data_structured,
-    column_config={
-        "Abteilung": st.column_config.TextColumn(
-            "Abteilung / Department",
-            disabled=True,
-            width="medium",
-            help="Department information"
-        ),
-        "Unterschrift": st.column_config.CheckboxColumn(
-            "Genehmigen / Approve", 
-            default=False
-        )
-    },
-    disabled=["Abteilung"],
-    num_rows="fixed",
-    hide_index=True,
-    use_container_width=True,
-    key="interactive_editor"
-)
-
-update_signature_status(edited_df)
-
-total_approvals = sum(1 for item in st.session_state.approval_data_structured if item.get("Unterschrift"))
-total_required = len(st.session_state.approval_data_structured)
-
-st.progress(total_approvals / total_required, text=f"Fortschritt / Progress: {total_approvals} von {total_required} Unterschriften gesammelt.")
-
-if total_approvals == total_required:
-    st.balloons()
-    st.success("🎉 Alle Parteien haben den Vertrag genehmigt! / All parties have approved!")
-elif total_approvals > 0:
-    st.warning("⚠️ Unterschriften ausstehend. / Signatures outstanding.")
-
-st.divider()
 
 # ── Section 2: Load Filtered Suppliers ────────────────────────────────────────
 csv_path = "filtered_supliers.csv"
