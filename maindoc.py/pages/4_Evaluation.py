@@ -121,4 +121,4 @@ if submit_comparison:
     
     # Strict award decision output block
     st.subheader("🏁 Sourcing Decision")
-    st.success(f"🏆 **The award goes to the one with the highest point: {winner} ({highest_score:.2f} / 10.00 points)**")
+    st.success(f"🏆 **The award goes to: {winner} ({highest_score:.2f} / 10.00 points)**")
