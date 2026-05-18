@@ -1,101 +1,95 @@
 import streamlit as st
 import pandas as pd
 import os
-import sqlite3
 
-# ── Page Config ──────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Team Supplier Evaluation Matrix",
-    page_icon="👥",
-    layout="wide",
-)
+# 1. This must be called ONLY ONCE and at the very top of the script
+st.set_page_config(page_title="Evaluation", layout="wide")
 
-# ── Hide Developer UI & Source Code Options ──────────────────────────────────
-# This completely removes the MainMenu, header toolbar, and footer for the end-user
-hide_ui_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    </style>
-"""
-st.markdown(hide_ui_style, unsafe_allow_html=True)
+st.title("Evaluation")
+st.write("📅 Due date: 2026-06-28")
 
-# ── Database Initialization ──────────────────────────────────────────────────
-DB_FILE = "team_evaluations.db"
+# Configuration - CHECK THESE PATHS
+SUPPLIER_FILE_PATH = "/Users/olivieol/Desktop/main/filtered_supliers.csv"
+MATRIX_PATH = "training_evaluation_matrix.csv"
 
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS ratings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            evaluator TEXT,
-            supplier TEXT,
-            final_score REAL
-        )
-    """)
-    conn.commit()
-    conn.close()
+def load_data():
+    suppliers = []
+    criteria = []
+    
+    # 1. Load Suppliers
+    if os.path.exists(SUPPLIER_FILE_PATH):
+        try:
+            sup_df = pd.read_csv(SUPPLIER_FILE_PATH)
+            col_map = {c.lower(): c for c in sup_df.columns}
+            if 'supplier name' in col_map:
+                suppliers = sup_df[col_map['supplier name']].unique().tolist()
+            elif 'supplier' in col_map:
+                suppliers = sup_df[col_map['supplier']].unique().tolist()
+            else:
+                st.error(f"Found columns {sup_df.columns.tolist()}, but none match 'supplier name'.")
+        except Exception as e:
+            st.error(f"Error reading Suppliers: {e}")
+    else:
+        st.error(f"File NOT found: {SUPPLIER_FILE_PATH}. Check the path/spelling.")
 
-def save_multiple_ratings(evaluator, supplier_scores):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    for supplier, score in supplier_scores.items():
-        c.execute("INSERT INTO ratings (evaluator, supplier, final_score) VALUES (?, ?, ?)", 
-                  (evaluator, supplier, score))
-    conn.commit()
-    conn.close()
+    # 2. Load Matrix Criteria
+    if os.path.exists(MATRIX_PATH):
+        try:
+            matrix_df = pd.read_csv(MATRIX_PATH)
+            criteria = [col for col in matrix_df.columns if '(' in col and '%' in col]
+        except Exception as e:
+            st.error(f"Error reading Matrix: {e}")
+    else:
+        st.error(f"File NOT found: {MATRIX_PATH}")
 
-def load_all_ratings():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query("SELECT * FROM ratings", conn)
-    conn.close()
-    return df
+    return suppliers, criteria
 
-# Initialize the shared database
-init_db()
 
-# ── Header ────────────────────────────────────────────────────────────────────
-st.title("🎯 Collaborative Supplier Evaluation Matrix")
-st.write("Enter your role, select three suppliers, and evaluate them simultaneously. Your entries will be aggregated into the team's final decision.")
-st.divider()
+def main():
+    # Removed st.set_page_config from here
+    st.header("🏆 Final Award Selection")
 
-# ── Load Filtered Suppliers ───────────────────────────────────────────────────
-csv_path = "filtered_supliers.csv"
+    suppliers, criteria = load_data()
+    if not suppliers or not criteria:
+        st.stop()
 
-if os.path.exists(csv_path):
-    try:
-        df_suppliers = pd.read_csv(csv_path)
-    except Exception as e:
-        st.error(f"Error loading CSV file: {e}")
-        df_suppliers = pd.DataFrame()
-else:
-    df_suppliers = pd.DataFrame()
+    all_final_scores = []
 
-if df_suppliers.empty:
-    st.warning("⚠️ No filtered suppliers found. Please run the RFQ Generator first to generate `filtered_supliers.csv`.")
-    st.stop()
+    with st.form("evaluation_form"):
+        for supplier in suppliers:
+            with st.expander(f"Assess: {supplier}", expanded=False):
+                cols = st.columns(len(criteria))
+                total_weighted = 0.0
+                for i, crit in enumerate(criteria):
+                    weight_val = float(crit.split('(')[-1].split('%')[0]) / 100
+                    score = cols[i].select_slider(f"{crit}", options=[1,2,3,4,5], value=3, key=f"{supplier}_{crit}")
+                    total_weighted += (score * weight_val)
+                
+                all_final_scores.append({"Supplier": supplier, "Final Score": round(total_weighted, 2)})
 
-supplier_options = sorted(df_suppliers["Supplier Name"].unique().tolist())
+        submit = st.form_submit_button("Generate Award File")
 
-# ── Criteria Definition ───────────────────────────────────────────────────────
-criteria = [
-    {"key": "preis", "label": "Preis", "weight": 0.30, "icon": "💶", "help": "How competitive and fair is the pricing?"},
-    {"key": "trainer_expertise", "label": "Trainer Expertise", "weight": 0.25, "icon": "🧑‍🏫", "help": "How experienced and knowledgeable are the trainers?"},
-    {"key": "industry_alignment", "label": "Industry Alignment", "weight": 0.20, "icon": "🏭", "help": "How well does the content align with industry needs?"},
-    {"key": "training_duration", "label": "Training Duration", "weight": 0.15, "icon": "⏱️", "help": "Is the duration appropriate for the depth covered?"},
-    {"key": "certification", "label": "Certification", "weight": 0.10, "icon": "🏅", "help": "How valuable and recognized is the certification?"},
-]
+    if submit:
+        res_df = pd.DataFrame(all_final_scores).sort_values(by="Final Score", ascending=False)
+        
+        # Show Results UI
+        st.divider()
+        st.dataframe(res_df, use_container_width=True)
+        st.bar_chart(res_df.set_index("Supplier"))
+        
+        # Winner Logic
+        winner_name = res_df.iloc[0]['Supplier']
+        winner_score = res_df.iloc[0]['Final Score']
 
-# ── Step 1: Evaluator Info & Supplier Setup ──────────────────────────────────
-st.subheader("✍️ Evaluation Session Setup")
-col_user, col_s1, col_s2, col_s3 = st.columns(4)
+        # File creation logic
+        clean_name = "".join([c for c in winner_name if c.isalnum() or c in (' ', '_')]).strip()
+        filename = f"{clean_name}.txt"
+        
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(f"AWARD WINNER: {winner_name}\nSCORE: {winner_score}")
 
-with col_user:
-    evaluator_name = st.text_input("Your Name / Role:", placeholder="e.g., Quality Auditor, Tech Lead")
-with col_s1:
-    sup1 = st.selectbox("Supplier A", options=supplier_options, index=0)
-with col_s2:
-    sup2 = st.selectbox("Supplier B", options=supplier_options,
+        st.balloons()
+        st.success(f"Award file created for {winner_name}!")
 
+if __name__ == "__main__":
+    main()
