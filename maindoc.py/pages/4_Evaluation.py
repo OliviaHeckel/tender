@@ -57,6 +57,68 @@ with st.form("comparison_form"):
         sup3 = st.selectbox("Supplier C", options=supplier_options, index=min(2, len(supplier_options)-1))
         
     st.divider()
-    st.subheader("📊 Performance
+    st.subheader("📊 Performance Matrix Evaluation (Rate 1 - 10)")
+    
+    # Dictionary to hold input scores
+    scores = {sup1: {}, sup2: {}, sup3: {}}
+    
+    # Loop through criteria to render input sliders in columns side-by-side
+    for c in criteria:
+        st.write(f"### {c['icon']} {c['label']} (Weight: {int(c['weight'] * 100)}%)")
+        st.caption(c['help'])
+        
+        c_col1, c_col2, c_col3 = st.columns(3)
+        
+        with c_col1:
+            scores[sup1][c['key']] = st.slider(f"Score for {sup1}", min_value=1, max_value=10, value=5, step=1, key=f"s1_{c['key']}")
+        with c_col2:
+            scores[sup2][c['key']] = st.slider(f"Score for {sup2}", min_value=1, max_value=10, value=5, step=1, key=f"s2_{c['key']}")
+        with c_col3:
+            scores[sup3][c['key']] = st.slider(f"Score for {sup3}", min_value=1, max_value=10, value=5, step=1, key=f"s3_{c['key']}")
+            
+        st.divider()
+        
+    submit_comparison = st.form_submit_button("Calculate Results & Compare Matrix")
 
-       
+# ── Evaluation Results and Sourcing Decision ─────────────────────────────────
+if submit_comparison:
+    # Compute weighted scores
+    totals = {}
+    for supplier in [sup1, sup2, sup3]:
+        totals[supplier] = sum(scores[supplier][c['key']] * c['weight'] for c in criteria)
+        
+    st.subheader("📊 Evaluation Comparison Summary")
+    
+    # Display the final performance metrics side-by-side
+    res_col1, res_col2, res_col3 = st.columns(3)
+    with res_col1:
+        st.metric(label=f"🏆 {sup1} Total Score", value=f"{totals[sup1]:.2f} / 10.00")
+    with res_col2:
+        st.metric(label=f"🏆 {sup2} Total Score", value=f"{totals[sup2]:.2f} / 10.00")
+    with res_col3:
+        st.metric(label=f"🏆 {sup3} Total Score", value=f"{totals[sup3]:.2f} / 10.00")
+        
+    st.divider()
+    
+    # Generate structured analysis table for visual breakdown
+    st.write("### Detailed Score Comparison Table")
+    comparison_data = []
+    for c in criteria:
+        comparison_data.append({
+            "Criterion": f"{c['icon']} {c['label']}",
+            "Weight": f"{int(c['weight'] * 100)}%",
+            f"{sup1} (Raw / Weighted)": f"{scores[sup1][c['key']]} / {(scores[sup1][c['key']]*c['weight']):.2f}",
+            f"{sup2} (Raw / Weighted)": f"{scores[sup2][c['key']]} / {(scores[sup2][c['key']]*c['weight']):.2f}",
+            f"{sup3} (Raw / Weighted)": f"{scores[sup3][c['key']]} / {(scores[sup3][c['key']]*c['weight']):.2f}",
+        })
+    st.table(pd.DataFrame(comparison_data))
+    
+    st.divider()
+    
+    # Determine winner based on maximum points
+    winner = max(totals, key=totals.get)
+    highest_score = totals[winner]
+    
+    # Strict award decision output block
+    st.subheader("🏁 Sourcing Decision")
+    st.success(f"🏆 **The award goes to the one with the highest point: {winner} ({highest_score:.2f} / 10.00 points)**")
