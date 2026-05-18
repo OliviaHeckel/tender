@@ -175,7 +175,7 @@ else:
     
     # Target decision award statement execution
     st.subheader("🏁 Sourcing Decision Award")
-    st.success(f"🏆 **Based on all compiled entries, the award goes to the one with the highest points: {top_supplier} ({top_score:.2f} / 10.00 average points)**")
+    st.success(f"🏆 **Based on all compiled entries, the award goes to: {top_supplier} ({top_score:.2f} / 10.00 average points)**")
     
     # Full history expansion for evaluation audits
     with st.expander("🔎 View detailed individual submission log"):
