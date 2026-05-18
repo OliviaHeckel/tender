@@ -3,8 +3,6 @@ import streamlit as st
 import pandas as pd
 import os
 
-import streamlit as st
-
 # ── Page Config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Training Evaluation",
@@ -13,8 +11,44 @@ st.set_page_config(
 )
 
 # ── Header ────────────────────────────────────────────────────────────────────
-st.title("🎯 Training Evaluation Tool")
-st.write("Rate each criterion from 1 (poor) to 10 (excellent). Scores are weighted automatically.")
+st.title("🎯 Supplier Training Evaluation Tool")
+st.write("Select a supplier from your filtered RFQ list and rate them from 1 (poor) to 10 (excellent).")
+st.divider()
+
+# ── Load Filtered Suppliers ───────────────────────────────────────────────────
+# Matches the exact filename output from 1_Requirements.py
+csv_path = "filtered_supliers.csv" 
+
+if os.path.exists(csv_path):
+    try:
+        df_suppliers = pd.read_csv(csv_path)
+    except Exception as e:
+        st.error(f"Error loading CSV file: {e}")
+        df_suppliers = pd.DataFrame()
+else:
+    df_suppliers = pd.DataFrame()
+
+# Guard clause if the RFQ generator hasn't been run yet
+if df_suppliers.empty:
+    st.warning("⚠️ No filtered suppliers found. Please run the RFQ Generator first to create the `filtered_supliers.csv` file.")
+    st.stop()
+
+# ── Supplier Selection ────────────────────────────────────────────────────────
+st.subheader("🏢 Supplier Selection")
+supplier_names = sorted(df_suppliers["Supplier Name"].unique().tolist())
+selected_supplier = st.selectbox("Choose a supplier to evaluate:", options=supplier_names)
+
+# Fetch details for the selected supplier to display as context
+supplier_data = df_suppliers[df_suppliers["Supplier Name"] == selected_supplier].iloc[0]
+
+col_inf1, col_inf2 = st.columns(2)
+with col_inf1:
+    st.write(f"**Contact Email:** {supplier_data.get('Contact Email', 'N/A')}")
+    st.write(f"**Participants Limit:** {supplier_data.get('Participants per Session', 'N/A')}")
+with col_inf2:
+    st.write(f"**Delivery Mode Available:** {supplier_data.get('Delivery Mode', 'N/A')}")
+    st.write(f"**Languages:** {supplier_data.get('Languages Available', 'N/A')}")
+
 st.divider()
 
 # ── Criteria Definition ───────────────────────────────────────────────────────
@@ -56,13 +90,13 @@ criteria = [
     },
 ]
 
-# ── Form ──────────────────────────────────────────────────────────────────────
+# ── Evaluation Form ───────────────────────────────────────────────────────────
 with st.form("evaluation_form"):
-    st.subheader("📋 Evaluation Criteria")
+    st.subheader(f"📋 Score Card: {selected_supplier}")
     
     scores = {}
     
-    # Render sliders using clean native configurations
+    # Render sliders dynamically
     for c in criteria:
         weight_pct = f"{int(c['weight'] * 100)}%"
         scores[c["key"]] = st.slider(
@@ -72,52 +106,17 @@ with st.form("evaluation_form"):
             value=5,
             step=1,
             help=c["help"],
-            key=c["key"],
+            key=f"{selected_supplier}_{c['key']}", # Unique key per supplier selection
         )
     
     st.divider()
-    st.subheader("💬 Comments")
+    st.subheader("💬 Evaluation Notes")
     comment = st.text_area(
         label="Additional Comments (optional)",
-        placeholder="Share any further thoughts about this training offer…",
+        placeholder=f"Share any further thoughts regarding the offer from {selected_supplier}…",
         height=110,
     )
     
-    submitted = st.form_submit_button("Calculate Weighted Score")
+    submitted = st.form_submit_button(f"Calculate Weighted Score for {selected_supplier}")
 
 # ── Results Execution ─────────────────────────────────────────────────────────
-if submitted:
-    weighted_total = sum(
-        scores[c["key"]] * c["weight"] for c in criteria
-    )
-    
-    st.divider()
-    st.subheader("📊 Score Breakdown")
-    
-    # Display performance metrics across columns natively
-    cols = st.columns(len(criteria))
-    for col, c in zip(cols, criteria):
-        raw = scores[c["key"]]
-        contrib = raw * c["weight"]
-        col.metric(
-            label=f"{c['icon']} {c['label']}",
-            value=f"{raw}/10",
-            delta=f"+{contrib:.2f} pts",
-        )
-        
-    st.divider()
-    st.subheader("🔎 Supplier Recommendation Summary")
-    st.write(f"### Weighted Total Score: **{weighted_total:.2f} / 10.00**")
-    
-    # Map the score verdicts to native alert components matching 1_Requirements.py
-    if weighted_total >= 8:
-        st.success("✅ **Highly Recommended**")
-    elif weighted_total >= 6:
-        st.warning("⚠️ **Conditionally Recommended**")
-    else:
-        st.error("❌ **Not Recommended**")
-        
-    if comment.strip():
-        st.info(f"📝 **Your comment:** {comment}")
-        
-    st.success("Evaluation completed successfully! Adjust the inputs above to recalculate at any time.")
