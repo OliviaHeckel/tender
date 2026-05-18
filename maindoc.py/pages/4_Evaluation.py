@@ -10,6 +10,17 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── Hide Developer UI & Source Code Options ──────────────────────────────────
+# This completely removes the MainMenu, header toolbar, and footer for the end-user
+hide_ui_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_ui_style, unsafe_allow_html=True)
+
 # ── Database Initialization ──────────────────────────────────────────────────
 DB_FILE = "team_evaluations.db"
 
@@ -86,47 +97,5 @@ with col_user:
 with col_s1:
     sup1 = st.selectbox("Supplier A", options=supplier_options, index=0)
 with col_s2:
-    sup2 = st.selectbox("Supplier B", options=supplier_options, index=min(1, len(supplier_options)-1))
-with col_s3:
-    sup3 = st.selectbox("Supplier C", options=supplier_options, index=min(2, len(supplier_options)-1))
+    sup2 = st.selectbox("Supplier B", options=supplier_options,
 
-st.divider()
-
-# ── Step 2: Simultaneous Evaluation Form ──────────────────────────────────────
-if not evaluator_name.strip():
-    st.info("💡 Please enter your name/role above to unlock the scoring matrix for the selected suppliers.")
-else:
-    with st.form("simultaneous_matrix_form"):
-        st.subheader(f"📋 Simultaneous Matrix (Evaluating as: {evaluator_name})")
-        
-        # Nested structure to hold scores: scores[supplier][criterion_key]
-        session_scores = {sup1: {}, sup2: {}, sup3: {}}
-        
-        # Generate side-by-side sliders per criterion
-        for c in criteria:
-            st.write(f"### {c['icon']} {c['label']} (Weight: {int(c['weight'] * 100)}%)")
-            st.caption(c['help'])
-            
-            c_col1, c_col2, c_col3 = st.columns(3)
-            with c_col1:
-                session_scores[sup1][c['key']] = st.slider(f"Score for {sup1}", min_value=1, max_value=10, value=5, step=1, key=f"s1_{c['key']}")
-            with c_col2:
-                session_scores[sup2][c['key']] = st.slider(f"Score for {sup2}", min_value=1, max_value=10, value=5, step=1, key=f"s2_{c['key']}")
-            with c_col3:
-                session_scores[sup3][c['key']] = st.slider(f"Score for {sup3}", min_value=1, max_value=10, value=5, step=1, key=f"s3_{c['key']}")
-            st.divider()
-            
-        submit_matrix = st.form_submit_button(f"Submit All 3 Evaluations as {evaluator_name}")
-
-    if submit_matrix:
-        # Calculate individual weighted totals for this submission
-        calculated_totals = {}
-        for supplier in [sup1, sup2, sup3]:
-            calculated_totals[supplier] = sum(session_scores[supplier][c['key']] * c['weight'] for c in criteria)
-            
-        # Write all 3 evaluations to the persistent database file simultaneously
-        save_multiple_ratings(evaluator_name, calculated_totals)
-        st.success(f"✅ Matrix submission complete! Evaluated {sup1}, {sup2}, and {sup3} successfully.")
-
-# ── Step 3: Consolidated Team Summary Dashboard ───────────────────────────────
-st.subheader
