@@ -5,7 +5,7 @@ import pandas as pd
 
 # 1. Setup and Data Loading
 st.set_page_config(page_title="RFQ Generator", layout="wide")
-df = pd.read_csv("main/automotive_training_suppliers_europe.csv")
+df = pd.read_csv("automotive_training_suppliers_europe.csv")
 
 # Helper to check ranges like "12-20"
 def check_capacity(range_str, required):
