@@ -5,13 +5,12 @@ import sqlite3
 
 # ── Page Config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Team Supplier Evaluation",
+    page_title="Team Supplier Evaluation Matrix",
     page_icon="👥",
     layout="wide",
 )
 
 # ── Database Initialization ──────────────────────────────────────────────────
-# This database file sits on the server/host machine and is shared by all users
 DB_FILE = "team_evaluations.db"
 
 def init_db():
@@ -28,11 +27,12 @@ def init_db():
     conn.commit()
     conn.close()
 
-def save_rating(evaluator, supplier, score):
+def save_multiple_ratings(evaluator, supplier_scores):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("INSERT INTO ratings (evaluator, supplier, final_score) VALUES (?, ?, ?)", 
-              (evaluator, supplier, score))
+    for supplier, score in supplier_scores.items():
+        c.execute("INSERT INTO ratings (evaluator, supplier, final_score) VALUES (?, ?, ?)", 
+                  (evaluator, supplier, score))
     conn.commit()
     conn.close()
 
@@ -46,8 +46,8 @@ def load_all_ratings():
 init_db()
 
 # ── Header ────────────────────────────────────────────────────────────────────
-st.title("👥 Team Supplier Evaluation & Alignment")
-st.write("Collaborative scoring tool. Submit your individual scores below to update the team's average.")
+st.title("🎯 Collaborative Supplier Evaluation Matrix")
+st.write("Enter your role, select three suppliers, and evaluate them simultaneously. Your entries will be aggregated into the team's final decision.")
 st.divider()
 
 # ── Load Filtered Suppliers ───────────────────────────────────────────────────
@@ -63,108 +63,70 @@ else:
     df_suppliers = pd.DataFrame()
 
 if df_suppliers.empty:
-    st.warning("⚠️ No filtered suppliers found. Please run the RFQ Generator first.")
+    st.warning("⚠️ No filtered suppliers found. Please run the RFQ Generator first to generate `filtered_supliers.csv`.")
     st.stop()
 
 supplier_options = sorted(df_suppliers["Supplier Name"].unique().tolist())
 
 # ── Criteria Definition ───────────────────────────────────────────────────────
 criteria = [
-    {"key": "preis", "label": "Preis", "weight": 0.30, "icon": "💶"},
-    {"key": "trainer_expertise", "label": "Trainer Expertise", "weight": 0.25, "icon": "🧑‍🏫"},
-    {"key": "industry_alignment", "label": "Industry Alignment", "weight": 0.20, "icon": "🏭"},
-    {"key": "training_duration", "label": "Training Duration", "weight": 0.15, "icon": "⏱️"},
-    {"key": "certification", "label": "Certification", "weight": 0.10, "icon": "🏅"},
+    {"key": "preis", "label": "Preis", "weight": 0.30, "icon": "💶", "help": "How competitive and fair is the pricing?"},
+    {"key": "trainer_expertise", "label": "Trainer Expertise", "weight": 0.25, "icon": "🧑‍🏫", "help": "How experienced and knowledgeable are the trainers?"},
+    {"key": "industry_alignment", "label": "Industry Alignment", "weight": 0.20, "icon": "🏭", "help": "How well does the content align with industry needs?"},
+    {"key": "training_duration", "label": "Training Duration", "weight": 0.15, "icon": "⏱️", "help": "Is the duration appropriate for the depth covered?"},
+    {"key": "certification", "label": "Certification", "weight": 0.10, "icon": "🏅", "help": "How valuable and recognized is the certification?"},
 ]
 
-# ── Step 1: User Identity & Supplier Selection ───────────────────────────────
-st.subheader("✍️ Your Evaluation Session")
-col_user, col_sup = st.columns(2)
+# ── Step 1: Evaluator Info & Supplier Setup ──────────────────────────────────
+st.subheader("✍️ Evaluation Session Setup")
+col_user, col_s1, col_s2, col_s3 = st.columns(4)
 
 with col_user:
-    evaluator_name = st.text_input("Enter Your Name / Role:", placeholder="e.g., Procurement Manager, Tech Lead")
-with col_sup:
-    selected_supplier = st.selectbox("Select Supplier to Rate:", options=supplier_options)
+    evaluator_name = st.text_input("Your Name / Role:", placeholder="e.g., Quality Auditor, Tech Lead")
+with col_s1:
+    sup1 = st.selectbox("Supplier A", options=supplier_options, index=0)
+with col_s2:
+    sup2 = st.selectbox("Supplier B", options=supplier_options, index=min(1, len(supplier_options)-1))
+with col_s3:
+    sup3 = st.selectbox("Supplier C", options=supplier_options, index=min(2, len(supplier_options)-1))
 
 st.divider()
 
-# ── Step 2: Individual Evaluation Form ───────────────────────────────────────
+# ── Step 2: Simultaneous Evaluation Form ──────────────────────────────────────
 if not evaluator_name.strip():
-    st.info("💡 Please enter your name above to unlock the scoring matrix.")
+    st.info("💡 Please enter your name/role above to unlock the scoring matrix for the selected suppliers.")
 else:
-    with st.form("user_evaluation_form"):
-        st.subheader(f"📋 Score Card for {selected_supplier} (Evaluating as: {evaluator_name})")
+    with st.form("simultaneous_matrix_form"):
+        st.subheader(f"📋 Simultaneous Matrix (Evaluating as: {evaluator_name})")
         
-        user_scores = {}
+        # Nested structure to hold scores: scores[supplier][criterion_key]
+        session_scores = {sup1: {}, sup2: {}, sup3: {}}
+        
+        # Generate side-by-side sliders per criterion
         for c in criteria:
-            weight_pct = f"{int(c['weight'] * 100)}%"
-            user_scores[c["key"]] = st.slider(
-                label=f"{c['icon']} {c['label']} (Weight: {weight_pct})",
-                min_value=1,
-                max_value=10,
-                value=5,
-                step=1,
-                key=f"input_{c['key']}"
-            )
+            st.write(f"### {c['icon']} {c['label']} (Weight: {int(c['weight'] * 100)}%)")
+            st.caption(c['help'])
             
-        submit_rating = st.form_submit_button("Submit My Scores to Team Dashboard")
-
-    if submit_rating:
-        # Calculate individual weighted total
-        individual_total = sum(user_scores[c["key"]] * c["weight"] for c in criteria)
-        
-        # Save securely to the shared database file
-        save_rating(evaluator_name, selected_supplier, individual_total)
-        st.success(f"✅ Thank you {evaluator_name}! Your score of **{individual_total:.2f}** for **{selected_supplier}** has been recorded.")
-
-# ── Step 3: Global Team Summary Dashboard ─────────────────────────────────────
-st.divider()
-st.subheader("📊 Team Summary Dashboard")
-
-# Read fresh data from the shared database file
-df_global = load_all_ratings()
-
-if df_global.empty:
-    st.info("No evaluations have been submitted by the team yet. Be the first!")
-else:
-    # 1. Calculate Aggregated Averages per Supplier
-    summary_df = df_global.groupby("supplier").agg(
-        Average_Score=("final_score", "mean"),
-        Total_Votes=("evaluator", "count")
-    ).reset_index()
-    
-    # Sort by highest score
-    summary_df = summary_df.sort_values(by="Average_Score", ascending=False).reset_index(drop=True)
-    
-    # 2. Display the current standing side-by-side
-    st.write("### Current Standings (Aggregated Team Averages)")
-    
-    # Display top 3 metrics if available
-    cols = st.columns(min(3, len(summary_df)))
-    for index, row in summary_df.head(3).iterrows():
-        if index < len(cols):
-            cols[index].metric(
-                label=f"Rank {index+1}: {row['supplier']}",
-                value=f"{row['Average_Score']:.2f} / 10",
-                delta=f"{row['Total_Votes']} reviews submitted"
-            )
+            c_col1, c_col2, c_col3 = st.columns(3)
+            with c_col1:
+                session_scores[sup1][c['key']] = st.slider(f"Score for {sup1}", min_value=1, max_value=10, value=5, step=1, key=f"s1_{c['key']}")
+            with c_col2:
+                session_scores[sup2][c['key']] = st.slider(f"Score for {sup2}", min_value=1, max_value=10, value=5, step=1, key=f"s2_{c['key']}")
+            with c_col3:
+                session_scores[sup3][c['key']] = st.slider(f"Score for {sup3}", min_value=1, max_value=10, value=5, step=1, key=f"s3_{c['key']}")
+            st.divider()
             
-    # 3. Final Sourcing Award Statement
-    st.divider()
-    top_supplier = summary_df.iloc[0]["supplier"]
-    top_score = summary_df.iloc[0]["Average_Score"]
-    
-    st.subheader("🏁 Current Sourcing Winner")
-    st.success(f"🏆 **Based on all team inputs, the award goes to the one with the highest points: {top_supplier} ({top_score:.2f} / 10.00 average points)**")
-    
-    # 4. Show Raw History for complete audit transparency
-    with st.expander("🔎 View detailed individual submission log"):
-        st.dataframe(
-            df_global[["evaluator", "supplier", "final_score"]].rename(
-                columns={"evaluator": "Team Member", "supplier": "Supplier", "final_score": "Submitted Score"}
-            ),
-            use_container_width=True
-        )
+        submit_matrix = st.form_submit_button(f"Submit All 3 Evaluations as {evaluator_name}")
 
-   
-       
+    if submit_matrix:
+        # Calculate individual weighted totals for this submission
+        calculated_totals = {}
+        for supplier in [sup1, sup2, sup3]:
+            calculated_totals[supplier] = sum(session_scores[supplier][c['key']] * c['weight'] for c in criteria)
+            
+        # Write all 3 evaluations to the persistent database file simultaneously
+        save_multiple_ratings(evaluator_name, calculated_totals)
+        st.success(f"✅ Matrix submission complete! Evaluated {sup1}, {sup2}, and {sup3} successfully.")
+
+# ── Step 3: Consolidated Team Summary Dashboard ───────────────────────────────
+st.subheader
