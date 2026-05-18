@@ -93,45 +93,4 @@ for i, step in enumerate(steps):
         </div>
         """, unsafe_allow_html=True)
 
-import streamlit as st
-from datetime import datetime
-
-st.set_page_config(
-    page_title="Weiterbildung Green Belt Ingolstadt",
-    layout="wide"
-)
-
-# ---------------- SIDEBAR DROPDOWN ----------------
-st.sidebar.title("📂 Navigation")
-
-page = st.sidebar.selectbox(
-    "Select process step:",
-    [
-        "Requirements",
-        "Short List Suppliers",
-        "Proposals",
-        "Evaluation",
-        "Award",
-        "Contract"
-    ]
-)
-
-# Page routing
-if page == "Requirements":
-    st.switch_page("pages/1_Requirements.py")
-
-elif page == "Short List Suppliers":
-    st.switch_page("pages/2_Short_List_Suppliers.py")
-
-elif page == "Proposals":
-    st.switch_page("pages/3_Proposals.py")
-
-elif page == "Evaluation":
-    st.switch_page("pages/4_Evaluation.py")
-
-elif page == "Award":
-    st.switch_page("pages/5_Award.py")
-
-elif page == "Contract":
-    st.switch_page("pages/6_Contract.py")
 
