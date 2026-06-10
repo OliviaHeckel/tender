@@ -89,7 +89,7 @@ for i, step in enumerate(steps):
         <div class="step-card">
             <div class="step-title">{step['name']}</div>
             <div class="step-date">📅 Due: <b>{step['date']}</b></div>
-            <div class="status">{status_icon}</div>
+            
         </div>
         """, unsafe_allow_html=True)
 
