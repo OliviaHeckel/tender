@@ -54,7 +54,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------ HEADER ------------------
-st.title("Vergabeprozess Weiterbildung Green Belt")
+st.title("Tender Prozess: Six Sigma Training")
 
 # Countdown Logic
 sop_date = datetime(2026, 10, 30, 9, 0)
