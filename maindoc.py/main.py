@@ -7,17 +7,7 @@ st.set_page_config(page_title="Weiterbildung Green Belt Ingolstadt", layout="wid
 
 # Status: 0 = not started (red), 1 = in progress (yellow), 2 = done (green)
 
-step_status = {
-    "Requirements": 2,
-    "Short List Suppliers": 1,
-    "Proposals": 0,
-    "Evaluation": 0,
-    "Award": 0,
-    "Contract": 0,
-}
 
-def get_status_icon(status):
-    return {0: "🔴", 1: "🟡", 2: "🟢"}[status]
 
 # ------------------ STYLING ------------------
 st.markdown("""
